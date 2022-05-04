@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: This template deploys a Lambda function that is used to create the cloudwatch alarms which monitors the usage of EBS volumes attached to EC2 instances.
+
+Resources:
+# Access is restriced to CloudWatch Metrics.
+  rLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+        - PolicyName: !Sub '${AWS::StackName}-LambdaPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: putcwmetric
+                Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricAlarm
+                Resource: !Sub "arn:aws:cloudwatch:*:${AWS::AccountId}:alarm:*"
+              - Sid: getcwmetric
+                Effect: Allow
+                Action:
+                  - cloudwatch:GetMetricData
+                  - cloudwatch:GetMetricStatistics
+                  - cloudwatch:ListMetrics
+                Resource: "*"
+              - Sid: ec2desc
+                Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                Resource: "*"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+  rLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: ec2metric.lambda_handler
+      Runtime: python3.8
+      MemorySize: 128
+      Role: !GetAtt 'rLambdaRole.Arn'
+      Timeout: 60
+
